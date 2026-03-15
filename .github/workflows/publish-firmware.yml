@@ -1,0 +1,205 @@
+name: Publish Firmware Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      klipper_ref:
+        description: "Klipper tag, branch, or commit SHA to build"
+        required: true
+        type: string
+      build_date:
+        description: "Build date (UTC, YYYY-MM-DD)"
+        required: true
+        type: string
+      notes:
+        description: "Optional publication notes"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set release id
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RELEASE_ID=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+
+      - name: Validate input date format
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! [[ "${{ github.event.inputs.build_date }}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "build_date must match YYYY-MM-DD"
+            exit 1
+          fi
+
+      - name: Validate source binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "firmware/profiles/octopus-f446-usb-can.config" || { echo "Missing profile: firmware/profiles/octopus-f446-usb-can.config"; exit 1; }
+          test -f "firmware/profiles/ebb42-g0b1-can.config" || { echo "Missing profile: firmware/profiles/ebb42-g0b1-can.config"; exit 1; }
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y make gcc-arm-none-eabi binutils-arm-none-eabi
+
+      - name: Build firmware binaries from Klipper ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          KLIPPER_DIR="$RUNNER_TEMP/klipper"
+          OUT_DIR="$RUNNER_TEMP/firmware-out"
+          rm -rf "$KLIPPER_DIR" "$OUT_DIR"
+          mkdir -p "$OUT_DIR"
+
+          git clone https://github.com/Klipper3d/klipper.git "$KLIPPER_DIR"
+          git -C "$KLIPPER_DIR" fetch --tags --force origin
+          git -C "$KLIPPER_DIR" checkout "${{ github.event.inputs.klipper_ref }}"
+
+          KLIPPER_SHA="$(git -C "$KLIPPER_DIR" rev-parse HEAD)"
+          echo "KLIPPER_SHA=$KLIPPER_SHA" >> "$GITHUB_ENV"
+
+          cp "firmware/profiles/octopus-f446-usb-can.config" "$KLIPPER_DIR/.config"
+          make -C "$KLIPPER_DIR" olddefconfig
+          make -C "$KLIPPER_DIR" clean
+          make -C "$KLIPPER_DIR" -j"$(nproc)"
+          cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/octopus-f446-usb-can.bin"
+
+          cp "firmware/profiles/ebb42-g0b1-can.config" "$KLIPPER_DIR/.config"
+          make -C "$KLIPPER_DIR" olddefconfig
+          make -C "$KLIPPER_DIR" clean
+          make -C "$KLIPPER_DIR" -j"$(nproc)"
+          cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/ebb42-g0b1-can.bin"
+
+      - name: Archive previous latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          REL_DIR="docs/firmware/releases/${RELEASE_ID}"
+          HAS_PREV=0
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+            if [ -f "$f" ]; then
+              HAS_PREV=1
+              break
+            fi
+          done
+          if [ "$HAS_PREV" -eq 0 ]; then
+            echo "No previous latest artifacts found; skipping archive"
+            exit 0
+          fi
+          mkdir -p "$REL_DIR"
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+            if [ -f "$f" ]; then
+              cp "$f" "$REL_DIR/"
+            fi
+          done
+
+      - name: Publish new latest binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/firmware/latest
+          cp "$RUNNER_TEMP/firmware-out/octopus-f446-usb-can.bin" docs/firmware/latest/octopus-f446-usb-can.bin
+          cp "$RUNNER_TEMP/firmware-out/ebb42-g0b1-can.bin" docs/firmware/latest/ebb42-g0b1-can.bin
+
+      - name: Generate latest manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          OCT_SHA="$(sha256sum docs/firmware/latest/octopus-f446-usb-can.bin | awk '{print $1}')"
+          EBB_SHA="$(sha256sum docs/firmware/latest/ebb42-g0b1-can.bin | awk '{print $1}')"
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          BUILD_DATE="${{ github.event.inputs.build_date }}"
+          KLIPPER_REF="${{ github.event.inputs.klipper_ref }} (${KLIPPER_SHA})"
+          NOTES="${{ github.event.inputs.notes }}"
+          export OCT_SHA EBB_SHA NOW BUILD_DATE KLIPPER_REF NOTES
+          python3 - <<'PY'
+          import json
+          import os
+
+          manifest = {
+              "generated_at": os.environ["NOW"],
+              "latest": {
+                  "octopus_f446_usb_can": {
+                      "board": "BTT Octopus v1.x (STM32F446)",
+                      "file": "octopus-f446-usb-can.bin",
+                      "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/octopus-f446-usb-can.bin",
+                      "sha256": os.environ["OCT_SHA"],
+                      "klipper_ref": os.environ["KLIPPER_REF"],
+                      "build_profile": "firmware/profiles/octopus-f446-usb-can.config",
+                      "flash_address": "0x08008000",
+                      "build_date": os.environ["BUILD_DATE"],
+                      "notes": os.environ.get("NOTES", ""),
+                  },
+                  "ebb42_g0b1_can": {
+                      "board": "BTT EBB42 v1.1 (STM32G0B1)",
+                      "file": "ebb42-g0b1-can.bin",
+                      "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/ebb42-g0b1-can.bin",
+                      "sha256": os.environ["EBB_SHA"],
+                      "klipper_ref": os.environ["KLIPPER_REF"],
+                      "build_profile": "firmware/profiles/ebb42-g0b1-can.config",
+                      "flash_address": "0x08000000",
+                      "build_date": os.environ["BUILD_DATE"],
+                      "notes": os.environ.get("NOTES", ""),
+                  },
+              },
+          }
+
+          with open("docs/firmware/latest/manifest.json", "w", encoding="utf-8") as f:
+              json.dump(manifest, f, indent=2)
+              f.write("\n")
+          PY
+
+      - name: Update release index
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX="docs/firmware/releases/index.md"
+          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${{ github.event.inputs.notes }} |"
+          if ! grep -q "| Release | Date | Klipper Ref | Notes |" "$INDEX"; then
+            printf "# Firmware Release History\n\n" > "$INDEX"
+            printf "Keep at least one previous known-good release available.\n\n" >> "$INDEX"
+            printf "| Release | Date | Klipper Ref | Notes |\n" >> "$INDEX"
+            printf "|---------|------|-------------|-------|\n" >> "$INDEX"
+          fi
+          printf "%s\n" "$LINE" >> "$INDEX"
+
+      - name: Commit and push publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/firmware/latest docs/firmware/releases
+          if git diff --cached --quiet; then
+            echo "No publication changes to commit"
+            exit 0
+          fi
+          git commit -m "docs(firmware): publish latest firmware artifacts"
+          git push
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

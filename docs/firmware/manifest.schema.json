@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crafter3d.github.io/printer-config/firmware/manifest.schema.json",
+  "title": "Crafter3D Firmware Manifest",
+  "type": "object",
+  "required": ["generated_at", "latest"],
+  "properties": {
+    "generated_at": {
+      "type": "string",
+      "description": "UTC timestamp in ISO-8601 format"
+    },
+    "latest": {
+      "type": "object",
+      "required": ["octopus_f446_usb_can", "ebb42_g0b1_can"],
+      "properties": {
+        "octopus_f446_usb_can": {
+          "$ref": "#/$defs/firmwareArtifact"
+        },
+        "ebb42_g0b1_can": {
+          "$ref": "#/$defs/firmwareArtifact"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "firmwareArtifact": {
+      "type": "object",
+      "required": [
+        "board",
+        "file",
+        "download_url",
+        "sha256",
+        "klipper_ref",
+        "build_profile",
+        "flash_address",
+        "build_date"
+      ],
+      "properties": {
+        "board": { "type": "string" },
+        "file": { "type": "string" },
+        "download_url": { "type": "string" },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "klipper_ref": { "type": "string" },
+        "build_profile": { "type": "string" },
+        "flash_address": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{8}$"
+        },
+        "build_date": {
+          "type": "string",
+          "description": "UTC date, e.g. 2026-03-15"
+        },
+        "notes": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

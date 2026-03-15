@@ -6,9 +6,9 @@ REPO_DIR="$HOME/printer-config"
 # Symlink printer.cfg
 ln -sf "$REPO_DIR/printer.cfg" "$CONFIG_DIR/printer.cfg"
 
-# Symlink all content directories (skip scripts, .git)
+# Symlink all content directories (skip scripts, .git, firmware artifacts)
 for dir in "$REPO_DIR"/*/; do
     dirname=$(basename "$dir")
-    [[ "$dirname" == "scripts" || "$dirname" == ".git" ]] && continue
+    [[ "$dirname" == "scripts" || "$dirname" == ".git" || "$dirname" == "firmware" ]] && continue
     ln -sf "$REPO_DIR/$dirname" "$CONFIG_DIR/$dirname"
 done
