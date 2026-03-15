@@ -1,60 +1,68 @@
-# Firmware and Provisioning Guide
+# Firmware Flashing and UUID Provisioning Guide
 
-This page documents flashing and UUID provisioning for Crafter 3D M6.
+This guide covers firmware download, flashing, and CAN UUID assignment for Crafter 3D M6.
 
-## Firmware Download
+## 1) Download Firmware
 
-Use the latest manifest:
+- [Octopus Firmware (.bin)](latest/octopus-f446-usb-can.bin)
+- [EBB42 Firmware (.bin)](latest/ebb42-g0b1-can.bin)
+- [Manifest (checksums, Klipper ref, metadata)](latest/manifest.json)
 
-- `latest/manifest.json`
+Always verify checksum and Klipper compatibility from the manifest before flashing.
 
-The manifest maps each board to:
+## 2) Flash Firmware (Windows, STM32CubeProgrammer)
 
-- binary file URL
-- Klipper version or commit SHA
-- profile used for build
-- flash start address
-- SHA256 checksum
-
-## Publish Latest Firmware (Maintainers)
-
-Use GitHub Actions workflow dispatch:
-
-- Workflow: `.github/workflows/publish-firmware.yml`
-- Required inputs: `klipper_ref`, `build_date`
-- Optional input: `notes`
-- Build inputs are taken from tracked profiles under `firmware/profiles/`
-
-The workflow archives previous latest artifacts, publishes new binaries under
-`firmware/latest/`, and regenerates `manifest.json`.
-
-## Flashing (Windows, STM32CubeProgrammer)
-
-1. Put target board in USB DFU mode.
-2. Connect in STM32CubeProgrammer.
-3. Select board binary from links in `latest/manifest.json`.
+1. Put target board into USB DFU mode.
+2. Open STM32CubeProgrammer and connect to the USB DFU device.
+3. Select the board-specific `.bin` file.
 4. Use start address:
-   - Octopus: `0x08008000`
-   - EBB42: `0x08000000`
-5. Flash, verify, and power cycle.
+   - Octopus (STM32F446): `0x08008000`
+   - EBB42 (STM32G0B1): `0x08000000`
+5. Flash and verify.
+6. Exit DFU mode and power cycle the printer.
 
-## UUID Discovery (Primary: Mainsail)
+## 3) Assign CAN UUIDs (Primary Method: Mainsail)
 
-1. Open `Machine -> Devices -> CAN`.
-2. Refresh and list unassigned UUIDs.
-3. If needed, disconnect/reconnect EBB42 to map board identity.
-4. Update `hardware/mcu.cfg` and restart Klipper.
+1. Open Mainsail.
+2. Go to `Machine -> Devices -> CAN`.
+3. Refresh and collect unassigned UUIDs.
+4. If board mapping is unclear, disconnect/reconnect EBB42 and refresh again.
+5. Update `hardware/mcu.cfg` with:
 
-## UUID Discovery (Fallback: CLI)
+```ini
+[mcu]
+canbus_uuid=<octopus_uuid>
+
+[mcu toolhead]
+canbus_uuid=<ebb42_uuid>
+```
+
+6. Restart Klipper.
+
+## 4) CLI Fallback (when UI is unavailable)
 
 ```bash
 ~/klippy-env/bin/python ~/klipper/scripts/canbus_query.py can0
 ```
 
-## Verify in Klipper Log
+Use the same board identification logic (disconnect/reconnect EBB42 if needed),
+then write UUIDs into `hardware/mcu.cfg`.
 
-Check recent MCU bring-up lines after restart:
+## 5) Post-Flash Validation
+
+Run:
 
 ```bash
 grep -E 'mcu|MCU|canbus|error|timeout' ~/printer_data/logs/klippy.log | tail -30
 ```
+
+Expected result: both MCUs initialize without timeout errors.
+
+## Maintainer Notes
+
+Latest firmware publication is automated by:
+
+- `.github/workflows/publish-firmware.yml`
+
+The workflow builds binaries from a selected `klipper_ref`, updates `latest/`,
+archives previous artifacts in `releases/`, and publishes via GitHub Pages.

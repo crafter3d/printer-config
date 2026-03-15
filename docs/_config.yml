@@ -1,3 +1,4 @@
 title: Crafter3D Printer Firmware Docs
+description: Official firmware downloads and provisioning guide for Crafter 3D M6 CAN boards.
 markdown: kramdown
-theme: minima
+theme: jekyll-theme-cayman

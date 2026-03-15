@@ -1,18 +1,25 @@
-# Crafter3D Printer Firmware Downloads
+# Crafter3D Firmware Portal
 
-This site publishes validated default firmware binaries and setup guidance for Crafter 3D M6 CAN boards.
+Official firmware downloads and setup guidance for Crafter 3D M6 CAN boards.
 
-## Quick Links
+## Download Latest Firmware
 
-- Latest firmware manifest: `firmware/latest/manifest.json`
-- Firmware compatibility guide: `firmware/index.md`
-- Release history: `firmware/releases/index.md`
+- [Download Octopus Firmware (.bin)](firmware/latest/octopus-f446-usb-can.bin)
+- [Download EBB42 Firmware (.bin)](firmware/latest/ebb42-g0b1-can.bin)
+- [Firmware Manifest (version, checksum, metadata)](firmware/latest/manifest.json)
 
-## Supported Targets
+## Guides
+
+- [Flashing and UUID Provisioning Guide](firmware/)
+- [Release History](firmware/releases/)
+
+## Supported Boards
 
 - BTT Octopus v1.x (STM32F446, USB-to-CAN bridge)
 - BTT EBB42 v1.1 (STM32G0B1, CAN)
 
-## Important
+## Safety Notes
 
-Always confirm the Klipper version/commit listed in the manifest before flashing.
+- Confirm the board model before flashing.
+- Verify firmware checksum from the manifest.
+- Confirm Klipper version/commit compatibility from the manifest before updating.
