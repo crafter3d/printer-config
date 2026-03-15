@@ -1,27 +1,27 @@
 {
-  "generated_at": "2026-03-15T16:13:02Z",
+  "generated_at": "2026-03-15T00:00:00Z",
   "latest": {
     "octopus_f446_usb_can": {
       "board": "BTT Octopus v1.x (STM32F446)",
       "file": "octopus-f446-usb-can.bin",
       "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/octopus-f446-usb-can.bin",
-      "sha256": "deedc8a972e8c9d3eaa1d271053130a9e1fe491372dbc47f4879e16a8d80c67b",
-      "klipper_ref": "v0.13.0 (61c0c8d2ef40340781835dd53fb04cc7a454e37a)",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "klipper_ref": "pending",
       "build_profile": "firmware/profiles/octopus-f446-usb-can.config",
       "flash_address": "0x08008000",
-      "build_date": "2026-03-15",
-      "notes": ""
+      "build_date": "pending",
+      "notes": "Placeholder entry. Replace with validated artifact metadata before release."
     },
     "ebb42_g0b1_can": {
       "board": "BTT EBB42 v1.1 (STM32G0B1)",
       "file": "ebb42-g0b1-can.bin",
       "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/ebb42-g0b1-can.bin",
-      "sha256": "63f538ee8ecf9934fb1d2400b1070a5175c11d2b8c203bde502e8263ce6010b4",
-      "klipper_ref": "v0.13.0 (61c0c8d2ef40340781835dd53fb04cc7a454e37a)",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "klipper_ref": "pending",
       "build_profile": "firmware/profiles/ebb42-g0b1-can.config",
       "flash_address": "0x08000000",
-      "build_date": "2026-03-15",
-      "notes": ""
+      "build_date": "pending",
+      "notes": "Placeholder entry. Replace with validated artifact metadata before release."
     }
   }
 }
