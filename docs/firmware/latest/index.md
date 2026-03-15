@@ -10,5 +10,6 @@ Use these files for current validated firmware releases.
 ## Metadata
 
 - [Manifest (checksums, Klipper version/commit)](manifest.json)
+- Latest Klipper reference: `v0.13.0 (61c0c8d2ef40340781835dd53fb04cc7a454e37a)`
 
 Always validate checksum and compatibility from `manifest.json` before flashing.

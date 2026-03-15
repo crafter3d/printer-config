@@ -10,16 +10,24 @@ This guide covers firmware download, flashing, and CAN UUID assignment for Craft
 
 Always verify checksum and Klipper compatibility from the manifest before flashing.
 
-## 2) Flash Firmware (Windows, STM32CubeProgrammer)
+## 2) Flash Firmware
 
-1. Put target board into USB DFU mode.
-2. Open STM32CubeProgrammer and connect to the USB DFU device.
-3. Select the board-specific `.bin` file.
-4. Use start address:
-   - Octopus (STM32F446): `0x08008000`
-   - EBB42 (STM32G0B1): `0x08000000`
+### Octopus (normal method: SD card)
+
+1. Copy the downloaded Octopus binary to an SD card.
+2. Rename it to `firmware.bin`.
+3. Insert SD card into Octopus.
+4. Power cycle the printer board.
+5. Wait for flash completion (board typically renames file after successful update).
+
+### EBB42 (normal method: STM32CubeProgrammer)
+
+1. Put EBB42 into USB DFU mode.
+2. Open STM32CubeProgrammer and connect to the USB DFU target.
+3. Select the EBB42 `.bin` file.
+4. Use flash start address `0x08000000`.
 5. Flash and verify.
-6. Exit DFU mode and power cycle the printer.
+6. Exit DFU mode and power cycle.
 
 ## 3) Assign CAN UUIDs (Primary Method: Mainsail)
 

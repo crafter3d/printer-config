@@ -170,17 +170,74 @@ jobs:
               f.write("\n")
           PY
 
+      - name: Generate latest downloads page
+        shell: bash
+        run: |
+          set -euo pipefail
+          KLIPPER_REF="${{ github.event.inputs.klipper_ref }} (${KLIPPER_SHA})"
+          cat > docs/firmware/latest/index.md <<EOF
+          # Latest Firmware Downloads
+
+          Use these files for current validated firmware releases.
+
+          ## Direct Downloads
+
+          - [Octopus Firmware (.bin)](octopus-f446-usb-can.bin)
+          - [EBB42 Firmware (.bin)](ebb42-g0b1-can.bin)
+
+          ## Build Reference
+
+          - Latest Klipper reference: ${KLIPPER_REF}
+          - [Manifest (checksums, Klipper version/commit)](manifest.json)
+
+          Always validate checksum and compatibility from manifest.json before flashing.
+          EOF
+
+      - name: Update homepage latest Klipper reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          KLIPPER_REF="${{ github.event.inputs.klipper_ref }} (${KLIPPER_SHA})"
+          export KLIPPER_REF
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          p = Path("docs/index.md")
+          text = p.read_text(encoding="utf-8")
+          pattern = r"<!--LATEST_KLIPPER_REF_START-->.*?<!--LATEST_KLIPPER_REF_END-->"
+          replacement = f"<!--LATEST_KLIPPER_REF_START-->`{os.environ['KLIPPER_REF']}`<!--LATEST_KLIPPER_REF_END-->"
+
+          new_text, n = re.subn(pattern, replacement, text, flags=re.DOTALL)
+          if n == 0:
+              raise SystemExit("Homepage marker not found: LATEST_KLIPPER_REF")
+          p.write_text(new_text, encoding="utf-8")
+          PY
+
+      - name: Snapshot current release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          REL_DIR="docs/firmware/releases/${RELEASE_ID}"
+          mkdir -p "$REL_DIR"
+          cp docs/firmware/latest/octopus-f446-usb-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/ebb42-g0b1-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/manifest.json "$REL_DIR/"
+
       - name: Update release index
         shell: bash
         run: |
           set -euo pipefail
           INDEX="docs/firmware/releases/index.md"
-          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${{ github.event.inputs.notes }} |"
-          if ! grep -q "| Release | Date | Klipper Ref | Notes |" "$INDEX"; then
+          OCT_LINK="[Download](./${RELEASE_ID}/octopus-f446-usb-can.bin)"
+          EBB_LINK="[Download](./${RELEASE_ID}/ebb42-g0b1-can.bin)"
+          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_LINK} | ${EBB_LINK} | ${{ github.event.inputs.notes }} |"
+          if ! grep -q "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |" "$INDEX"; then
             printf "# Firmware Release History\n\n" > "$INDEX"
             printf "Keep at least one previous known-good release available.\n\n" >> "$INDEX"
-            printf "| Release | Date | Klipper Ref | Notes |\n" >> "$INDEX"
-            printf "|---------|------|-------------|-------|\n" >> "$INDEX"
+            printf "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |\n" >> "$INDEX"
+            printf "|---------|------|-------------|------------------|----------------|-------|\n" >> "$INDEX"
           fi
           printf "%s\n" "$LINE" >> "$INDEX"
 
