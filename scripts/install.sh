@@ -10,17 +10,8 @@ REPO_DIR="${HOME}/printer-config"
 SAVE_CONFIG_MARKER_REGEX='^#\*# <[- ]*SAVE_CONFIG[- ]*>$'
 
 MANAGED_DIRS=(
-    autolevelling
-    cooling
     display
-    hardware
-    heated_bed
-    input_shaper
-    led
     macros
-    motors
-    temperature
-    toolhead
 )
 
 if [[ ! -d "${CONFIG_DIR}" || ! -d "${REPO_DIR}" ]]; then
