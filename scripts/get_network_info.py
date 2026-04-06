@@ -2,7 +2,7 @@
 """Generate a Klipper include file with host IP and hostname.
 
 This avoids any Moonraker dependency by writing values directly into
-`display/network_info_values.cfg` before Klipper starts.
+`local/generated/network_info_values.cfg` before Klipper starts.
 """
 
 import ipaddress
@@ -17,7 +17,7 @@ import time
 
 def _get_output_path():
     home = Path(os.environ.get("HOME") or str(Path.home()))
-    return home / "printer_data" / "config" / "display" / "network_info_values.cfg"
+    return home / "printer_data" / "config" / "local" / "generated" / "network_info_values.cfg"
 
 
 def _get_ip():
