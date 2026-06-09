@@ -55,6 +55,7 @@ jobs:
           set -euo pipefail
           test -f "firmware/profiles/octopus-f446-usb-can.config" || { echo "Missing profile: firmware/profiles/octopus-f446-usb-can.config"; exit 1; }
           test -f "firmware/profiles/ebb42-g0b1-can.config" || { echo "Missing profile: firmware/profiles/ebb42-g0b1-can.config"; exit 1; }
+          test -f "firmware/profiles/u2c-v21-g0b1-usb-can.config" || { echo "Missing profile: firmware/profiles/u2c-v21-g0b1-usb-can.config"; exit 1; }
 
       - name: Install build dependencies
         shell: bash
@@ -91,13 +92,19 @@ jobs:
           make -C "$KLIPPER_DIR" -j"$(nproc)"
           cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/ebb42-g0b1-can.bin"
 
+          cp "firmware/profiles/u2c-v21-g0b1-usb-can.config" "$KLIPPER_DIR/.config"
+          make -C "$KLIPPER_DIR" olddefconfig
+          make -C "$KLIPPER_DIR" clean
+          make -C "$KLIPPER_DIR" -j"$(nproc)"
+          cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/u2c-v21-g0b1-usb-can.bin"
+
       - name: Archive previous latest
         shell: bash
         run: |
           set -euo pipefail
           REL_DIR="docs/firmware/releases/${RELEASE_ID}"
           HAS_PREV=0
-          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/u2c-v21-g0b1-usb-can.bin docs/firmware/latest/u2c-v21/firmware.bin docs/firmware/latest/manifest.json; do
             if [ -f "$f" ]; then
               HAS_PREV=1
               break
@@ -107,10 +114,14 @@ jobs:
             echo "No previous latest artifacts found; skipping archive"
             exit 0
           fi
-          mkdir -p "$REL_DIR"
-          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+          mkdir -p "$REL_DIR" "$REL_DIR/u2c-v21"
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/u2c-v21-g0b1-usb-can.bin docs/firmware/latest/u2c-v21/firmware.bin docs/firmware/latest/manifest.json; do
             if [ -f "$f" ]; then
-              cp "$f" "$REL_DIR/"
+              if [ "$f" = "docs/firmware/latest/u2c-v21/firmware.bin" ]; then
+                cp "$f" "$REL_DIR/u2c-v21/firmware.bin"
+              else
+                cp "$f" "$REL_DIR/"
+              fi
             fi
           done
 
@@ -118,9 +129,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p docs/firmware/latest
+          mkdir -p docs/firmware/latest docs/firmware/latest/u2c-v21
           cp "$RUNNER_TEMP/firmware-out/octopus-f446-usb-can.bin" docs/firmware/latest/octopus-f446-usb-can.bin
           cp "$RUNNER_TEMP/firmware-out/ebb42-g0b1-can.bin" docs/firmware/latest/ebb42-g0b1-can.bin
+          cp "$RUNNER_TEMP/firmware-out/u2c-v21-g0b1-usb-can.bin" docs/firmware/latest/u2c-v21-g0b1-usb-can.bin
+          cp "$RUNNER_TEMP/firmware-out/u2c-v21-g0b1-usb-can.bin" docs/firmware/latest/u2c-v21/firmware.bin
 
       - name: Generate latest manifest
         shell: bash
@@ -128,11 +141,12 @@ jobs:
           set -euo pipefail
           OCT_SHA="$(sha256sum docs/firmware/latest/octopus-f446-usb-can.bin | awk '{print $1}')"
           EBB_SHA="$(sha256sum docs/firmware/latest/ebb42-g0b1-can.bin | awk '{print $1}')"
+          U2C_SHA="$(sha256sum docs/firmware/latest/u2c-v21-g0b1-usb-can.bin | awk '{print $1}')"
           NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           BUILD_DATE="${{ github.event.inputs.build_date }}"
           KLIPPER_REF="${{ github.event.inputs.klipper_ref }} (${KLIPPER_SHA})"
           NOTES="${{ github.event.inputs.notes }}"
-          export OCT_SHA EBB_SHA NOW BUILD_DATE KLIPPER_REF NOTES
+          export OCT_SHA EBB_SHA U2C_SHA NOW BUILD_DATE KLIPPER_REF NOTES
           python3 - <<'PY'
           import json
           import os
@@ -162,6 +176,19 @@ jobs:
                       "build_date": os.environ["BUILD_DATE"],
                       "notes": os.environ.get("NOTES", ""),
                   },
+                  "u2c_v21_g0b1_usb_can": {
+                      "board": "BTT U2C v2.1 (STM32G0B1)",
+                      "file": "u2c-v21-g0b1-usb-can.bin",
+                      "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/u2c-v21-g0b1-usb-can.bin",
+                      "ready_to_flash_file": "firmware.bin",
+                      "ready_to_flash_download_url": "https://crafter3d.github.io/printer-config/firmware/latest/u2c-v21/firmware.bin",
+                      "sha256": os.environ["U2C_SHA"],
+                      "klipper_ref": os.environ["KLIPPER_REF"],
+                      "build_profile": "firmware/profiles/u2c-v21-g0b1-usb-can.config",
+                      "flash_address": "0x08000000",
+                      "build_date": os.environ["BUILD_DATE"],
+                      "notes": os.environ.get("NOTES", ""),
+                  },
               },
           }
 
@@ -184,6 +211,8 @@ jobs:
 
           - [Octopus Firmware (.bin)](octopus-f446-usb-can.bin)
           - [EBB42 Firmware (.bin)](ebb42-g0b1-can.bin)
+          - [U2C v2.1 Firmware (.bin)](u2c-v21-g0b1-usb-can.bin)
+          - [U2C v2.1 Ready-to-Flash firmware.bin](u2c-v21/firmware.bin)
 
           ## Build Reference
 
@@ -220,9 +249,11 @@ jobs:
         run: |
           set -euo pipefail
           REL_DIR="docs/firmware/releases/${RELEASE_ID}"
-          mkdir -p "$REL_DIR"
+          mkdir -p "$REL_DIR" "$REL_DIR/u2c-v21"
           cp docs/firmware/latest/octopus-f446-usb-can.bin "$REL_DIR/"
           cp docs/firmware/latest/ebb42-g0b1-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/u2c-v21-g0b1-usb-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/u2c-v21/firmware.bin "$REL_DIR/u2c-v21/firmware.bin"
           cp docs/firmware/latest/manifest.json "$REL_DIR/"
 
       - name: Update release index
@@ -232,12 +263,13 @@ jobs:
           INDEX="docs/firmware/releases/index.md"
           OCT_LINK="[Download](./${RELEASE_ID}/octopus-f446-usb-can.bin)"
           EBB_LINK="[Download](./${RELEASE_ID}/ebb42-g0b1-can.bin)"
-          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_LINK} | ${EBB_LINK} | ${{ github.event.inputs.notes }} |"
-          if ! grep -q "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |" "$INDEX"; then
+          U2C_LINK="[Download](./${RELEASE_ID}/u2c-v21/firmware.bin)"
+          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_LINK} | ${EBB_LINK} | ${U2C_LINK} | ${{ github.event.inputs.notes }} |"
+          if ! grep -q "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | U2C firmware.bin | Notes |" "$INDEX"; then
             printf "# Firmware Release History\n\n" > "$INDEX"
             printf "Keep at least one previous known-good release available.\n\n" >> "$INDEX"
-            printf "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |\n" >> "$INDEX"
-            printf "|---------|------|-------------|------------------|----------------|-------|\n" >> "$INDEX"
+            printf "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | U2C firmware.bin | Notes |\n" >> "$INDEX"
+            printf "|---------|------|-------------|------------------|----------------|------------------|-------|\n" >> "$INDEX"
           fi
           printf "%s\n" "$LINE" >> "$INDEX"
 

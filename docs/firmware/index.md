@@ -6,6 +6,8 @@ This guide covers firmware download, flashing, and CAN UUID assignment for Craft
 
 - [Octopus Firmware (.bin)](latest/octopus-f446-usb-can.bin)
 - [EBB42 Firmware (.bin)](latest/ebb42-g0b1-can.bin)
+- [U2C v2.1 Firmware (.bin)](latest/u2c-v21-g0b1-usb-can.bin)
+- [U2C v2.1 Ready-to-Flash firmware.bin](latest/u2c-v21/firmware.bin)
 - [Manifest (checksums, Klipper ref, metadata)](latest/manifest.json)
 
 Always verify checksum and Klipper compatibility from the manifest before flashing.
@@ -28,6 +30,14 @@ Always verify checksum and Klipper compatibility from the manifest before flashi
 4. Use flash start address `0x08000000`.
 5. Flash and verify.
 6. Exit DFU mode and power cycle.
+
+### U2C v2.1 (normal method: microSD card)
+
+1. Download the ready-to-flash `firmware.bin`.
+2. Copy it to the root of the U2C microSD card.
+3. Insert the card into the U2C v2.1.
+4. Power cycle or reset the adapter.
+5. Wait for the flash to complete before removing the card.
 
 ## 3) Assign CAN UUIDs (Primary Method: Mainsail)
 
