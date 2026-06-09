@@ -54,7 +54,9 @@ jobs:
         run: |
           set -euo pipefail
           test -f "firmware/profiles/octopus-f446-usb-can.config" || { echo "Missing profile: firmware/profiles/octopus-f446-usb-can.config"; exit 1; }
+          test -f "firmware/profiles/octopus-f446-usb.config" || { echo "Missing profile: firmware/profiles/octopus-f446-usb.config"; exit 1; }
           test -f "firmware/profiles/ebb42-g0b1-can.config" || { echo "Missing profile: firmware/profiles/ebb42-g0b1-can.config"; exit 1; }
+          test -f "firmware/profiles/u2c-v21-g0b1-usb-can.config" || { echo "Missing profile: firmware/profiles/u2c-v21-g0b1-usb-can.config"; exit 1; }
 
       - name: Install build dependencies
         shell: bash
@@ -79,17 +81,20 @@ jobs:
           KLIPPER_SHA="$(git -C "$KLIPPER_DIR" rev-parse HEAD)"
           echo "KLIPPER_SHA=$KLIPPER_SHA" >> "$GITHUB_ENV"
 
-          cp "firmware/profiles/octopus-f446-usb-can.config" "$KLIPPER_DIR/.config"
-          make -C "$KLIPPER_DIR" olddefconfig
-          make -C "$KLIPPER_DIR" clean
-          make -C "$KLIPPER_DIR" -j"$(nproc)"
-          cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/octopus-f446-usb-can.bin"
+          build_firmware() {
+            local profile="$1"
+            local output="$2"
+            cp "firmware/profiles/${profile}" "$KLIPPER_DIR/.config"
+            make -C "$KLIPPER_DIR" olddefconfig
+            make -C "$KLIPPER_DIR" clean
+            make -C "$KLIPPER_DIR" -j"$(nproc)"
+            cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/${output}"
+          }
 
-          cp "firmware/profiles/ebb42-g0b1-can.config" "$KLIPPER_DIR/.config"
-          make -C "$KLIPPER_DIR" olddefconfig
-          make -C "$KLIPPER_DIR" clean
-          make -C "$KLIPPER_DIR" -j"$(nproc)"
-          cp "$KLIPPER_DIR/out/klipper.bin" "$OUT_DIR/ebb42-g0b1-can.bin"
+          build_firmware "octopus-f446-usb-can.config" "octopus-f446-usb-can.bin"
+          build_firmware "octopus-f446-usb.config" "octopus-f446-usb.bin"
+          build_firmware "ebb42-g0b1-can.config" "ebb42-g0b1-can.bin"
+          build_firmware "u2c-v21-g0b1-usb-can.config" "u2c-v21-g0b1-usb-can.bin"
 
       - name: Archive previous latest
         shell: bash
@@ -97,7 +102,7 @@ jobs:
           set -euo pipefail
           REL_DIR="docs/firmware/releases/${RELEASE_ID}"
           HAS_PREV=0
-          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/octopus-f446-usb.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/u2c-v21-g0b1-usb-can.bin docs/firmware/latest/manifest.json; do
             if [ -f "$f" ]; then
               HAS_PREV=1
               break
@@ -108,7 +113,7 @@ jobs:
             exit 0
           fi
           mkdir -p "$REL_DIR"
-          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/manifest.json; do
+          for f in docs/firmware/latest/octopus-f446-usb-can.bin docs/firmware/latest/octopus-f446-usb.bin docs/firmware/latest/ebb42-g0b1-can.bin docs/firmware/latest/u2c-v21-g0b1-usb-can.bin docs/firmware/latest/manifest.json; do
             if [ -f "$f" ]; then
               cp "$f" "$REL_DIR/"
             fi
@@ -120,19 +125,23 @@ jobs:
           set -euo pipefail
           mkdir -p docs/firmware/latest
           cp "$RUNNER_TEMP/firmware-out/octopus-f446-usb-can.bin" docs/firmware/latest/octopus-f446-usb-can.bin
+          cp "$RUNNER_TEMP/firmware-out/octopus-f446-usb.bin" docs/firmware/latest/octopus-f446-usb.bin
           cp "$RUNNER_TEMP/firmware-out/ebb42-g0b1-can.bin" docs/firmware/latest/ebb42-g0b1-can.bin
+          cp "$RUNNER_TEMP/firmware-out/u2c-v21-g0b1-usb-can.bin" docs/firmware/latest/u2c-v21-g0b1-usb-can.bin
 
       - name: Generate latest manifest
         shell: bash
         run: |
           set -euo pipefail
-          OCT_SHA="$(sha256sum docs/firmware/latest/octopus-f446-usb-can.bin | awk '{print $1}')"
+          OCT_BRIDGE_SHA="$(sha256sum docs/firmware/latest/octopus-f446-usb-can.bin | awk '{print $1}')"
+          OCT_USB_SHA="$(sha256sum docs/firmware/latest/octopus-f446-usb.bin | awk '{print $1}')"
           EBB_SHA="$(sha256sum docs/firmware/latest/ebb42-g0b1-can.bin | awk '{print $1}')"
+          U2C_SHA="$(sha256sum docs/firmware/latest/u2c-v21-g0b1-usb-can.bin | awk '{print $1}')"
           NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           BUILD_DATE="${{ github.event.inputs.build_date }}"
           KLIPPER_REF="${{ github.event.inputs.klipper_ref }} (${KLIPPER_SHA})"
           NOTES="${{ github.event.inputs.notes }}"
-          export OCT_SHA EBB_SHA NOW BUILD_DATE KLIPPER_REF NOTES
+          export OCT_BRIDGE_SHA OCT_USB_SHA EBB_SHA U2C_SHA NOW BUILD_DATE KLIPPER_REF NOTES
           python3 - <<'PY'
           import json
           import os
@@ -140,13 +149,26 @@ jobs:
           manifest = {
               "generated_at": os.environ["NOW"],
               "latest": {
-                  "octopus_f446_usb_can": {
+                  "octopus_f446_usb_can_bridge": {
                       "board": "BTT Octopus v1.x (STM32F446)",
+                      "mode": "USB-to-CAN bridge",
                       "file": "octopus-f446-usb-can.bin",
                       "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/octopus-f446-usb-can.bin",
-                      "sha256": os.environ["OCT_SHA"],
+                      "sha256": os.environ["OCT_BRIDGE_SHA"],
                       "klipper_ref": os.environ["KLIPPER_REF"],
                       "build_profile": "firmware/profiles/octopus-f446-usb-can.config",
+                      "flash_address": "0x08008000",
+                      "build_date": os.environ["BUILD_DATE"],
+                      "notes": os.environ.get("NOTES", ""),
+                  },
+                  "octopus_f446_usb": {
+                      "board": "BTT Octopus v1.x (STM32F446)",
+                      "mode": "USB serial",
+                      "file": "octopus-f446-usb.bin",
+                      "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/octopus-f446-usb.bin",
+                      "sha256": os.environ["OCT_USB_SHA"],
+                      "klipper_ref": os.environ["KLIPPER_REF"],
+                      "build_profile": "firmware/profiles/octopus-f446-usb.config",
                       "flash_address": "0x08008000",
                       "build_date": os.environ["BUILD_DATE"],
                       "notes": os.environ.get("NOTES", ""),
@@ -158,6 +180,18 @@ jobs:
                       "sha256": os.environ["EBB_SHA"],
                       "klipper_ref": os.environ["KLIPPER_REF"],
                       "build_profile": "firmware/profiles/ebb42-g0b1-can.config",
+                      "flash_address": "0x08000000",
+                      "build_date": os.environ["BUILD_DATE"],
+                      "notes": os.environ.get("NOTES", ""),
+                  },
+                  "u2c_v21_g0b1_usb_can": {
+                      "board": "BTT U2C v2.1 (STM32G0B1)",
+                      "mode": "USB-to-CAN bridge",
+                      "file": "u2c-v21-g0b1-usb-can.bin",
+                      "download_url": "https://crafter3d.github.io/printer-config/firmware/latest/u2c-v21-g0b1-usb-can.bin",
+                      "sha256": os.environ["U2C_SHA"],
+                      "klipper_ref": os.environ["KLIPPER_REF"],
+                      "build_profile": "firmware/profiles/u2c-v21-g0b1-usb-can.config",
                       "flash_address": "0x08000000",
                       "build_date": os.environ["BUILD_DATE"],
                       "notes": os.environ.get("NOTES", ""),
@@ -182,8 +216,10 @@ jobs:
 
           ## Direct Downloads
 
-          - [Octopus Firmware (.bin)](octopus-f446-usb-can.bin)
+          - [Octopus Firmware (.bin, USB-to-CAN bridge)](octopus-f446-usb-can.bin)
+          - [Octopus Firmware (.bin, USB serial)](octopus-f446-usb.bin)
           - [EBB42 Firmware (.bin)](ebb42-g0b1-can.bin)
+          - [U2C v2.1 Firmware (.bin)](u2c-v21-g0b1-usb-can.bin)
 
           ## Build Reference
 
@@ -222,7 +258,9 @@ jobs:
           REL_DIR="docs/firmware/releases/${RELEASE_ID}"
           mkdir -p "$REL_DIR"
           cp docs/firmware/latest/octopus-f446-usb-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/octopus-f446-usb.bin "$REL_DIR/"
           cp docs/firmware/latest/ebb42-g0b1-can.bin "$REL_DIR/"
+          cp docs/firmware/latest/u2c-v21-g0b1-usb-can.bin "$REL_DIR/"
           cp docs/firmware/latest/manifest.json "$REL_DIR/"
 
       - name: Update release index
@@ -230,14 +268,16 @@ jobs:
         run: |
           set -euo pipefail
           INDEX="docs/firmware/releases/index.md"
-          OCT_LINK="[Download](./${RELEASE_ID}/octopus-f446-usb-can.bin)"
+          OCT_BRIDGE_LINK="[Download](./${RELEASE_ID}/octopus-f446-usb-can.bin)"
+          OCT_USB_LINK="[Download](./${RELEASE_ID}/octopus-f446-usb.bin)"
           EBB_LINK="[Download](./${RELEASE_ID}/ebb42-g0b1-can.bin)"
-          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_LINK} | ${EBB_LINK} | ${{ github.event.inputs.notes }} |"
-          if ! grep -q "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |" "$INDEX"; then
+          U2C_LINK="[Download](./${RELEASE_ID}/u2c-v21-g0b1-usb-can.bin)"
+          LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_BRIDGE_LINK} | ${OCT_USB_LINK} | ${EBB_LINK} | ${U2C_LINK} | ${{ github.event.inputs.notes }} |"
+          if ! grep -q "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Firmware | Notes |" "$INDEX"; then
             printf "# Firmware Release History\n\n" > "$INDEX"
             printf "Keep at least one previous known-good release available.\n\n" >> "$INDEX"
-            printf "| Release | Date | Klipper Ref | Octopus Firmware | EBB42 Firmware | Notes |\n" >> "$INDEX"
-            printf "|---------|------|-------------|------------------|----------------|-------|\n" >> "$INDEX"
+            printf "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Firmware | Notes |\n" >> "$INDEX"
+            printf "|---------|------|-------------|-------------------------|-------------|----------------|--------------|-------|\n" >> "$INDEX"
           fi
           printf "%s\n" "$LINE" >> "$INDEX"
 
@@ -247,7 +287,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/firmware/latest docs/firmware/releases
+          git add docs/index.md docs/firmware/latest docs/firmware/releases
           if git diff --cached --quiet; then
             echo "No publication changes to commit"
             exit 0
