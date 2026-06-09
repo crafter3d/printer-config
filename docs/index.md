@@ -4,9 +4,10 @@ Official firmware downloads and setup guidance for Crafter 3D M6 CAN boards.
 
 ## Download Latest Firmware
 
-- [Download Octopus Firmware (.bin)](firmware/latest/octopus-f446-usb-can.bin)
+- [Download Octopus Bridge Firmware (.bin)](firmware/latest/octopus-f446-usb-can.bin)
 - [Download EBB42 Firmware (.bin)](firmware/latest/ebb42-g0b1-can.bin)
 - [Firmware Manifest (version, checksum, metadata)](firmware/latest/manifest.json)
+- Additional Octopus USB and U2C artifacts are listed in the [firmware guide](firmware/).
 - Latest Klipper reference: <!--LATEST_KLIPPER_REF_START-->`v0.13.0 (61c0c8d2ef40340781835dd53fb04cc7a454e37a)`<!--LATEST_KLIPPER_REF_END-->
 
 ## Guides
@@ -16,7 +17,8 @@ Official firmware downloads and setup guidance for Crafter 3D M6 CAN boards.
 
 ## Supported Boards
 
-- BTT Octopus v1.x (STM32F446, USB-to-CAN bridge)
+- BTT Octopus v1.x (STM32F446, USB serial or USB-to-CAN bridge)
+- BTT U2C v2.1 (STM32G0B1, USB-to-CAN bridge)
 - BTT EBB42 v1.1 (STM32G0B1, CAN)
 
 ## Safety Notes

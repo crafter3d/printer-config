@@ -1,12 +1,12 @@
 #!/bin/bash
-# Writes CAN UUIDs into ~/printer-config/hardware/mcu.cfg.
+# Writes the default USB-Octopus + U2C + EBB42 topology into ~/printer_data/config/local/mcus.cfg.
 set -euo pipefail
 
-REPO_DIR="${HOME}/printer-config"
-MCU_CFG="${REPO_DIR}/hardware/mcu.cfg"
+CONFIG_DIR="${HOME}/printer_data/config"
+MCU_CFG="${CONFIG_DIR}/local/mcus.cfg"
 
 usage() {
-    echo "Usage: $(basename "$0") <octopus_uuid> <ebb42_uuid>"
+    echo "Usage: $(basename "$0") <octopus_serial_path> <ebb42_uuid> [can_interface]"
 }
 
 valid_uuid() {
@@ -14,16 +14,17 @@ valid_uuid() {
     [[ "$value" =~ ^[0-9a-f]{12}$ ]]
 }
 
-if [[ $# -ne 2 ]]; then
+if [[ $# -lt 2 || $# -gt 3 ]]; then
     usage
     exit 1
 fi
 
-OCTOPUS_UUID="$1"
+OCTOPUS_SERIAL="$1"
 EBB42_UUID="$2"
+CAN_INTERFACE="${3:-can0}"
 
-if ! valid_uuid "$OCTOPUS_UUID"; then
-    echo "Error: invalid Octopus UUID '$OCTOPUS_UUID'. Expected 12 lowercase hex chars." >&2
+if [[ "${OCTOPUS_SERIAL}" != /dev/serial/by-id/* ]]; then
+    echo "Error: Octopus serial path must start with /dev/serial/by-id/." >&2
     exit 2
 fi
 
@@ -50,22 +51,29 @@ trap cleanup EXIT
 
 cat > "$TMP_FILE" <<EOF
 #####################################################################
-# 	MCU Configuration
+#  Local MCU parameters (preserved across updates)
 #####################################################################
 
+# Default topology:
+# - Octopus on direct USB
+# - U2C v2.1 as the host CAN interface
+# - EBB42 on CAN
+#
 # UUIDs are unique per physical printer and must be assigned during provisioning.
 # Primary flow: Mainsail -> Machine -> Devices -> CAN -> identify and copy UUIDs.
 # Secondary flow: run canbus_query.py over SSH.
 
 [mcu]
-canbus_uuid=${OCTOPUS_UUID}
+serial: ${OCTOPUS_SERIAL}
 
 [mcu toolhead]
 canbus_uuid=${EBB42_UUID}
+canbus_interface: ${CAN_INTERFACE}
 EOF
 
 cp "$TMP_FILE" "$MCU_CFG"
 
 echo "Updated $MCU_CFG"
-echo "  [mcu]          canbus_uuid=${OCTOPUS_UUID}"
+echo "  [mcu]          serial=${OCTOPUS_SERIAL}"
 echo "  [mcu toolhead] canbus_uuid=${EBB42_UUID}"
+echo "  [mcu toolhead] canbus_interface=${CAN_INTERFACE}"
