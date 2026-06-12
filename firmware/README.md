@@ -12,11 +12,10 @@ This directory defines the default firmware targets for Crafter 3D M6 setups:
 - `profiles/octopus-f446-usb-can.config`: Klipper profile for Octopus when it acts as the USB-to-CAN bridge.
 - `profiles/octopus-f446-usb.config`: Klipper profile for Octopus when it connects directly over USB.
 - `profiles/ebb42-g0b1-can.config`: Klipper profile for EBB42.
-- `profiles/u2c-v21-g0b1-usb-can.config`: Klipper profile for U2C v2.1.
 - `octopus-usb-can/firmware.bin`: Local/staging artifact path for Octopus bridge mode.
 - `octopus-usb/firmware.bin`: Local/staging artifact path for Octopus USB mode.
 - `ebb42/firmware.bin`: Local/staging artifact path for EBB42.
-- `u2c-v21/firmware.bin`: Local/staging artifact path for U2C v2.1.
+- `u2c-v21/firmware.bin`: Local/staging artifact path for the fixed external U2C v2.1 firmware.
 - `../docs/firmware/latest/manifest.json`: Published latest artifact metadata.
 
 ## Build Firmware from Profiles
@@ -56,15 +55,10 @@ make
 cp out/klipper.bin ~/printer-config/firmware/ebb42/firmware.bin
 ```
 
-Then build U2C v2.1:
+U2C v2.1 is not built from this repository. Use the fixed external firmware:
 
 ```bash
-cd ~/klipper
-cp ~/printer-config/firmware/profiles/u2c-v21-g0b1-usb-can.config .config
-make olddefconfig
-make clean
-make
-cp out/klipper.bin ~/printer-config/firmware/u2c-v21/firmware.bin
+wget https://raw.githubusercontent.com/Esoterical/voron_canbus/main/can_adapter/BigTreeTech%20U2C%20v2.1/G0B1_U2C_V2.bin -O ~/printer-config/firmware/u2c-v21/firmware.bin
 ```
 
 ## Flashing Workflows
@@ -72,8 +66,8 @@ cp out/klipper.bin ~/printer-config/firmware/u2c-v21/firmware.bin
 Primary flashing workflow depends on the target board:
 
 - Octopus: SD card
-- EBB42: USB DFU via STM32CubeProgrammer
-- U2C v2.1: microSD card
+- EBB42: USB DFU via `dfu-util`
+- U2C v2.1: USB DFU via `dfu-util`
 
 ## Topology Warnings
 
@@ -81,6 +75,8 @@ Primary flashing workflow depends on the target board:
 - If Octopus is the active USB-to-CAN bridge, do not also use a U2C as the host bridge on the same Klipper host.
 - Power the printer off before moving BOOT jumpers, inserting/removing SD cards, or connecting/disconnecting CAN wiring.
 - For EBB42 USB DFU, disconnect the printer-side CAN and 24V harness before plugging the board into USB to avoid dual-powering the toolhead board.
+- Use the fixed external U2C firmware from Esoterical's guide. The Klipper-built U2C artifact was removed because it does not enumerate correctly as a CAN adapter.
+- Reference docs: [BTT U2C v2.1 guide](https://canbus.esoterical.online/can_adapter/BigTreeTech%20U2C%20v2.1/README.html) and [BTT EBB42 V1.2 guide](https://canbus.esoterical.online/toolhead_flashing/common_hardware/BigTreeTech%20EBB42%20V1.2/README.html).
 
 ### Octopus (USB-to-CAN bridge mode)
 
@@ -97,18 +93,31 @@ Primary flashing workflow depends on the target board:
 
 ### EBB42
 
-1. Enter DFU mode on the EBB42 target board.
-2. Connect in STM32CubeProgrammer as a USB target.
-3. Load the EBB42 `firmware.bin`.
-4. Use flash start address `0x08000000`.
-5. Flash, verify, remove BOOT mode, and power cycle.
+1. Disconnect EBB42 from the printer-side CAN and 24V harness.
+2. Add the USB power jumper, then connect EBB42 to the Pi with USB.
+3. Hold `RESET` and `BOOT`, release `RESET`, then release `BOOT`.
+4. Confirm DFU mode with `lsusb` or `sudo dfu-util -l`; expected USB ID is `0483:df11`.
+5. Flash with:
+
+```bash
+sudo dfu-util -D ./ebb42-g0b1-can.bin -a 0 -s 0x08000000:mass-erase:force
+```
+
+6. Unplug USB, remove the USB power jumper, reconnect the CAN/power harness, and power cycle the printer.
 
 ### U2C v2.1
 
-1. Rename the downloaded `.bin` file to `firmware.bin`.
-2. Copy `firmware.bin` to the root of a microSD card.
-3. Insert the card into the U2C v2.1.
-4. Power cycle or reset the adapter and wait for the flash to complete.
+1. Disconnect CAN wiring from the U2C and connect only USB to the Pi.
+2. Hold the U2C `BOOT` button while plugging it into USB.
+3. Confirm DFU mode with `lsusb` or `sudo dfu-util -l`; expected USB ID is `0483:df11`.
+4. Flash the fixed firmware with:
+
+```bash
+sudo dfu-util -D ./u2c-v21-g0b1-usb-can.bin -a 0 -s 0x08000000:leave
+```
+
+5. Ignore `error during download get-status` if the rest of the flash completed successfully.
+6. Unplug the U2C, release BOOT/remove any BOOT jumper, plug it back in normally, and verify `can0` or `can1` appears with `ip -br link`.
 
 ## UUID Discovery and Assignment
 
@@ -131,8 +140,8 @@ Secondary method (CLI fallback):
 When updating any `firmware.bin`, update this file with:
 
 - Build date
-- Klipper commit/tag
-- Profile used
+- Klipper commit/tag for repo-built firmware
+- Build profile for repo-built firmware or source URL for externally sourced firmware
 - Operator initials or CI job reference
 
 ## Current Artifact Status
@@ -151,7 +160,8 @@ Publish end-user downloadable binaries from `docs/firmware/latest/` with a stabl
 - Manifest URL: `https://crafter3d.github.io/printer-config/firmware/latest/manifest.json`
 - Guide URL: `https://crafter3d.github.io/printer-config/firmware/`
 
-Each published binary must include Klipper version/commit metadata in the manifest.
+Repo-built binaries must include Klipper version/commit metadata in the manifest.
+The U2C binary is the fixed external firmware from Esoterical's guide and is published with its source URL and checksum in the manifest.
 
 ## Publishing Process (GitHub Workflow)
 
@@ -159,8 +169,10 @@ Use workflow dispatch in GitHub Actions to publish latest binaries:
 
 - Workflow: `.github/workflows/publish-firmware.yml`
 - Build source: Klipper repository at selected `klipper_ref`
-- Build profiles: `firmware/profiles/octopus-f446-usb-can.config`, `firmware/profiles/octopus-f446-usb.config`, `firmware/profiles/ebb42-g0b1-can.config`, `firmware/profiles/u2c-v21-g0b1-usb-can.config`
+- Build profiles: `firmware/profiles/octopus-f446-usb-can.config`, `firmware/profiles/octopus-f446-usb.config`, `firmware/profiles/ebb42-g0b1-can.config`
+- U2C source: `https://raw.githubusercontent.com/Esoterical/voron_canbus/main/can_adapter/BigTreeTech%20U2C%20v2.1/G0B1_U2C_V2.bin`
 - Output publish path: `docs/firmware/latest/`
 
-The workflow computes SHA256 checksums, updates `manifest.json`, archives the
-previous `latest` into `docs/firmware/releases/`, and commits changes to `main`.
+The workflow builds Octopus/EBB42 from Klipper, downloads the fixed U2C binary,
+computes SHA256 checksums, updates `manifest.json`, archives the previous
+`latest` into `docs/firmware/releases/`, and commits changes to `main`.
