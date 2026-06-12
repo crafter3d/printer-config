@@ -280,11 +280,11 @@ jobs:
           EBB_LINK="[Download](./${RELEASE_ID}/ebb42-g0b1-can.bin)"
           U2C_LINK="[Download](./${RELEASE_ID}/u2c-v21-g0b1-usb-can.bin)"
           LINE="| ${RELEASE_ID} | ${{ github.event.inputs.build_date }} | ${{ github.event.inputs.klipper_ref }} | ${OCT_BRIDGE_LINK} | ${OCT_USB_LINK} | ${EBB_LINK} | ${U2C_LINK} | ${{ github.event.inputs.notes }} |"
-          if ! grep -q "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Firmware | Notes |" "$INDEX"; then
+          if ! grep -q "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Fixed Firmware | Notes |" "$INDEX"; then
             printf "# Firmware Release History\n\n" > "$INDEX"
             printf "Keep at least one previous known-good release available.\n\n" >> "$INDEX"
-            printf "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Firmware | Notes |\n" >> "$INDEX"
-            printf "|---------|------|-------------|-------------------------|-------------|----------------|--------------|-------|\n" >> "$INDEX"
+            printf "| Release | Date | Klipper Ref | Octopus USB-CAN Bridge | Octopus USB | EBB42 Firmware | U2C Fixed Firmware | Notes |\n" >> "$INDEX"
+            printf "|---------|------|-------------|-------------------------|-------------|----------------|--------------------|-------|\n" >> "$INDEX"
           fi
           printf "%s\n" "$LINE" >> "$INDEX"
 

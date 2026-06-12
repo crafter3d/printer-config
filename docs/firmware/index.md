@@ -8,10 +8,10 @@ Use [latest/manifest.json](latest/manifest.json) as the source of truth for chec
 
 Published artifact names:
 
-- `octopus-f446-usb-can.bin`: Octopus when it is the USB-to-CAN bridge
-- `octopus-f446-usb.bin`: Octopus when it is connected directly by USB
-- `ebb42-g0b1-can.bin`: EBB42 toolhead board
-- `u2c-v21-g0b1-usb-can.bin`: fixed external U2C v2.1 bridge firmware
+- [octopus-f446-usb-can.bin](latest/octopus-f446-usb-can.bin): Octopus when it is the USB-to-CAN bridge
+- [octopus-f446-usb.bin](latest/octopus-f446-usb.bin): Octopus when it is connected directly by USB
+- [ebb42-g0b1-can.bin](latest/ebb42-g0b1-can.bin): EBB42 toolhead board
+- [u2c-v21-g0b1-usb-can.bin](latest/u2c-v21-g0b1-usb-can.bin): fixed external U2C v2.1 bridge firmware
 - [Latest downloads directory](latest/)
 
 Always verify checksum and Klipper compatibility from the manifest before flashing.
@@ -23,6 +23,7 @@ Always verify checksum and Klipper compatibility from the manifest before flashi
 - If you use Octopus as the USB-to-CAN bridge, do not also put a U2C bridge in the same host-to-CAN path.
 - For EBB42 USB DFU, unplug the CAN/power harness before connecting USB to avoid powering the board from both the printer and the host.
 - For U2C, use the fixed external firmware from Esoterical's guide. Do not use a Klipper-built U2C image.
+- Reference docs: [BTT U2C v2.1 guide](https://canbus.esoterical.online/can_adapter/BigTreeTech%20U2C%20v2.1/README.html) and [BTT EBB42 V1.2 guide](https://canbus.esoterical.online/toolhead_flashing/common_hardware/BigTreeTech%20EBB42%20V1.2/README.html).
 
 ## 3) Flash Firmware
 
@@ -42,23 +43,57 @@ Always verify checksum and Klipper compatibility from the manifest before flashi
 4. Power cycle the printer board.
 5. Wait for flash completion.
 
-### EBB42 (STM32CubeProgrammer)
+### EBB42 (USB DFU with dfu-util)
 
-1. Put EBB42 into USB DFU mode.
-2. Open STM32CubeProgrammer and connect to the USB DFU target.
-3. Select the EBB42 `.bin` file.
-4. Use flash start address `0x08000000`.
-5. Flash and verify.
-6. Exit DFU mode and power cycle.
+1. Disconnect EBB42 from the printer-side CAN and 24V harness.
+2. Add the USB power jumper, then connect EBB42 to the Pi with USB.
+3. Hold `RESET` and `BOOT`, release `RESET`, then release `BOOT`.
+4. Confirm DFU mode:
 
-### U2C v2.1 (microSD card)
+```bash
+lsusb
+sudo dfu-util -l
+```
 
-1. Download `u2c-v21-g0b1-usb-can.bin` from this repo, which mirrors the fixed external `G0B1_U2C_V2.bin`.
-2. Rename it to `firmware.bin`.
-3. Copy it to the root of the U2C microSD card.
-4. Insert the card into the U2C v2.1.
-5. Power cycle or reset the adapter.
-6. Wait for the flash to complete before removing the card.
+Expected USB ID is `0483:df11` for `STMicroelectronics STM Device in DFU Mode`.
+
+5. Flash the EBB42 firmware:
+
+```bash
+sudo dfu-util -D ./ebb42-g0b1-can.bin -a 0 -s 0x08000000:mass-erase:force
+```
+
+6. Unplug USB, remove the USB power jumper, reconnect the CAN/power harness, and power cycle the printer.
+
+Reference: [Esoterical BTT EBB42 V1.2 guide](https://canbus.esoterical.online/toolhead_flashing/common_hardware/BigTreeTech%20EBB42%20V1.2/README.html).
+
+### U2C v2.1 (USB DFU with dfu-util)
+
+1. Disconnect CAN wiring from the U2C and connect only USB to the Pi.
+2. Hold the U2C `BOOT` button while plugging it into USB.
+3. Confirm DFU mode:
+
+```bash
+lsusb
+sudo dfu-util -l
+```
+
+Expected USB ID is `0483:df11` for `STMicroelectronics STM Device in DFU Mode`.
+
+4. Flash the fixed U2C firmware:
+
+```bash
+sudo dfu-util -D ./u2c-v21-g0b1-usb-can.bin -a 0 -s 0x08000000:leave
+```
+
+5. Ignore `error during download get-status` if the rest of the flash completed successfully.
+6. Unplug the U2C, release BOOT/remove any BOOT jumper, plug it back in normally, and verify a CAN interface appears:
+
+```bash
+ip -br link
+```
+
+Reference: [Esoterical BTT U2C v2.1 guide](https://canbus.esoterical.online/can_adapter/BigTreeTech%20U2C%20v2.1/README.html).
 
 ## 4) Assign CAN UUIDs (Primary Method: Mainsail)
 
