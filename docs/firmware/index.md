@@ -11,7 +11,7 @@ Published artifact names:
 - `octopus-f446-usb-can.bin`: Octopus when it is the USB-to-CAN bridge
 - `octopus-f446-usb.bin`: Octopus when it is connected directly by USB
 - `ebb42-g0b1-can.bin`: EBB42 toolhead board
-- `u2c-v21-g0b1-usb-can.bin`: U2C v2.1 bridge
+- `u2c-v21-g0b1-usb-can.bin`: fixed external U2C v2.1 bridge firmware
 - [Latest downloads directory](latest/)
 
 Always verify checksum and Klipper compatibility from the manifest before flashing.
@@ -22,6 +22,7 @@ Always verify checksum and Klipper compatibility from the manifest before flashi
 - If you use a dedicated U2C bridge, flash Octopus with `octopus-f446-usb.bin`. Do not use the Octopus bridge build in that topology.
 - If you use Octopus as the USB-to-CAN bridge, do not also put a U2C bridge in the same host-to-CAN path.
 - For EBB42 USB DFU, unplug the CAN/power harness before connecting USB to avoid powering the board from both the printer and the host.
+- For U2C, use the fixed external firmware from Esoterical's guide. Do not use a Klipper-built U2C image.
 
 ## 3) Flash Firmware
 
@@ -52,7 +53,7 @@ Always verify checksum and Klipper compatibility from the manifest before flashi
 
 ### U2C v2.1 (microSD card)
 
-1. Download `u2c-v21-g0b1-usb-can.bin`.
+1. Download `u2c-v21-g0b1-usb-can.bin` from this repo, which mirrors the fixed external `G0B1_U2C_V2.bin`.
 2. Rename it to `firmware.bin`.
 3. Copy it to the root of the U2C microSD card.
 4. Insert the card into the U2C v2.1.
@@ -107,4 +108,5 @@ Latest firmware publication is automated by:
 - `.github/workflows/publish-firmware.yml`
 
 The workflow builds binaries from a selected `klipper_ref`, updates `latest/`,
-archives previous artifacts in `releases/`, and publishes via GitHub Pages.
+downloads the fixed U2C firmware, archives previous artifacts in `releases/`,
+and publishes via GitHub Pages.
